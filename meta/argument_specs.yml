@@ -1,0 +1,84 @@
+---
+argument_specs:
+  main:
+    short_description: >-
+      Install sops/age, a dedicated ansible-core venv, and a systemd
+      service+timer that periodically runs ansible-pull against a Git
+      repository to apply GitOps-managed configuration.
+    options:
+      gitops_agent_repo_url:
+        type: str
+        required: true
+        description: Git URL that ansible-pull clones/pulls from.
+      gitops_agent_playbook:
+        type: str
+        required: true
+        description: >-
+          Path within the checkout to the entry playbook (e.g.
+          gitops/site.yml). This is the only coupling point to the gitops
+          repo's internal layout — dirname() of this value is used to
+          locate ansible.cfg inside the checkout.
+      gitops_agent_branch:
+        type: str
+        default: main
+        description: Git branch/ref ansible-pull checks out.
+      gitops_agent_poll_interval:
+        type: str
+        default: 5min
+        description: systemd timer OnUnitActiveSec value.
+      gitops_agent_checkout_dir:
+        type: path
+        default: /opt/gitops-checkout
+        description: Directory ansible-pull clones the repo into.
+      gitops_agent_install_dir:
+        type: path
+        default: /opt/gitops-agent
+        description: Directory the dedicated ansible-core venv is installed into.
+      gitops_agent_environment_file:
+        type: path
+        default: /etc/gitops/environment
+        description: >-
+          Externally provisioned (by cloud-init) file; this role only
+          checks for its existence as a readiness guard, never reads its
+          contents.
+      gitops_agent_deploy_key_path:
+        type: path
+        default: /etc/gitops/deploy_key
+        description: >-
+          Externally provisioned SSH deploy key path. This role never
+          reads its contents, only references the path.
+      gitops_agent_age_key_path:
+        type: path
+        default: /etc/gitops/age.key
+        description: >-
+          Externally provisioned age private key path. This role never
+          reads its contents, only references the path.
+      gitops_agent_known_hosts:
+        type: str
+        description: >-
+          Content templated into a dedicated known_hosts file (not the
+          system/user default) used only for the gitops-pull deploy key.
+          Defaults to GitHub's published SSH host keys — override if the
+          git host isn't GitHub.
+      gitops_agent_verify_commit:
+        type: bool
+        default: false
+        description: >-
+          When true, passes --verify-commit to ansible-pull. Requires the
+          operator to separately provision a GPG keyring on the host with
+          the repo's signing keys.
+      gitops_agent_sops_version:
+        type: str
+        default: "3.13.3"
+        description: Pinned sops version. Checksum is verified dynamically, nothing else to update.
+      gitops_agent_age_version:
+        type: str
+        default: "1.3.2"
+        description: Pinned age/age-keygen version. Checksum is verified dynamically, nothing else to update.
+      gitops_agent_ansible_core_version:
+        type: str
+        default: "2.19.15"
+        description: >-
+          Pinned ansible-core version, used as
+          "ansible-core=={{ gitops_agent_ansible_core_version }}" when
+          installing into the dedicated venv.

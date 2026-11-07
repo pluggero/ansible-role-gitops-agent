@@ -1,0 +1,31 @@
+---
+- name: Template gitops-pull.service
+  ansible.builtin.template:
+    src: gitops-pull.service.j2
+    dest: /etc/systemd/system/gitops-pull.service
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+  notify: Reload systemd daemon
+
+- name: Template gitops-pull.timer
+  ansible.builtin.template:
+    src: gitops-pull.timer.j2
+    dest: /etc/systemd/system/gitops-pull.timer
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+  notify: Reload systemd daemon
+
+- name: Flush handlers before enabling units
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start gitops-pull timer
+  ansible.builtin.systemd_service:
+    name: gitops-pull.timer
+    state: started
+    enabled: true
+    masked: false
+  become: true

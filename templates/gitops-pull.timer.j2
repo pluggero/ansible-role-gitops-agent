@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically trigger gitops-pull.service
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec={{ gitops_agent_poll_interval }}
+RandomizedDelaySec=30s
+Unit=gitops-pull.service
+
+[Install]
+WantedBy=timers.target

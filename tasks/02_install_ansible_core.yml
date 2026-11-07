@@ -1,0 +1,44 @@
+---
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ var_file }}"
+  with_first_found:
+    - "{{ role_path }}/vars/{{ ansible_distribution }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ role_path }}/vars/{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ role_path }}/vars/{{ ansible_distribution }}.yml"
+    - "{{ role_path }}/vars/{{ ansible_os_family }}.yml"
+    - "{{ role_path }}/vars/{{ ansible_lsb.id }}.yml"
+  loop_control:
+    loop_var: var_file
+
+- name: Install OS-specific venv dependencies
+  ansible.builtin.include_tasks: "{{ task_file }}"
+  with_first_found:
+    - "{{ role_path }}/tasks/noauto_install_dep_{{ ansible_distribution }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ role_path }}/tasks/noauto_install_dep_{{ ansible_os_family }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ role_path }}/tasks/noauto_install_dep_{{ ansible_distribution }}.yml"
+    - "{{ role_path }}/tasks/noauto_install_dep_{{ ansible_os_family }}.yml"
+    - "{{ role_path }}/tasks/noauto_install_dep_{{ ansible_lsb.id }}.yml"
+  loop_control:
+    loop_var: task_file
+
+- name: Ensure venv parent directory exists
+  ansible.builtin.file:
+    path: "{{ gitops_agent_install_dir }}"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
+
+- name: Create ansible-core venv
+  ansible.builtin.command:
+    cmd: "python3 -m venv {{ gitops_agent_install_dir }}/venv"
+    creates: "{{ gitops_agent_install_dir }}/venv/bin/python"
+  become: true
+
+- name: Install pinned ansible-core into venv
+  ansible.builtin.pip:
+    name: "ansible-core=={{ gitops_agent_ansible_core_version }}"
+    state: present
+    virtualenv: "{{ gitops_agent_install_dir }}/venv"
+  become: true

@@ -1,0 +1,13 @@
+---
+- name: Check installed age version
+  ansible.builtin.command: age --version
+  register: gitops_agent_age_version_check
+  ignore_errors: true
+  changed_when: false
+  failed_when: false
+
+- name: Set installed age version fact
+  ansible.builtin.set_fact:
+    gitops_agent_age_installed_version: >-
+      {{ (gitops_agent_age_version_check.stdout | default('') | regex_search('v(\d+\.\d+\.\d+)', '\1'))
+         | default([''], true) | first }}

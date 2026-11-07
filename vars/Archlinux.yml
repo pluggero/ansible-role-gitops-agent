@@ -1,0 +1,3 @@
+---
+gitops_agent_dep_pkgs:
+  - python

@@ -1,0 +1,22 @@
+---
+- name: Converge
+  hosts: all
+
+  vars_files:
+    - ../../vars/molecule.yml
+
+  vars:
+    ansible_user: ansible
+    ansible_password: ansible
+    ansible_become_password: ansible
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == 'Debian'
+      become: true
+
+  roles:
+    - role: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"

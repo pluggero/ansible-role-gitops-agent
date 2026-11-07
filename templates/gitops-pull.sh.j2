@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Managed by Ansible, please don't edit manually
+set -euo pipefail
+
+if [ ! -f "{{ gitops_agent_environment_file }}" ] || \
+   [ ! -f "{{ gitops_agent_deploy_key_path }}" ] || \
+   [ ! -f "{{ gitops_agent_age_key_path }}" ]; then
+    echo "gitops not yet configured by cloud-init, skipping"
+    exit 0
+fi
+
+LOCK_FILE="/run/gitops-pull.lock"
+exec 9>"${LOCK_FILE}"
+if ! flock -n 9; then
+    echo "gitops-pull already running, skipping"
+    exit 0
+fi
+
+export SOPS_AGE_KEY_FILE="{{ gitops_agent_age_key_path }}"
+export GIT_SSH_COMMAND="ssh -i {{ gitops_agent_deploy_key_path }} -o IdentitiesOnly=yes -o UserKnownHostsFile=/etc/gitops/known_hosts -o StrictHostKeyChecking=yes"
+export ANSIBLE_CONFIG="{{ gitops_agent_checkout_dir }}/$(dirname "{{ gitops_agent_playbook }}")/ansible.cfg"
+
+# On failure, this script exits non-zero and does nothing else: no
+# rollback, no "docker compose down". Whatever the last successful run
+# left running keeps running untouched.
+{{ gitops_agent_install_dir }}/venv/bin/ansible-pull \
+    -U "{{ gitops_agent_repo_url }}" \
+    -C "{{ gitops_agent_branch }}" \
+    -d "{{ gitops_agent_checkout_dir }}" \
+    -i localhost, \
+    --only-if-changed \
+{% if gitops_agent_verify_commit %}
+    --verify-commit \
+{% endif %}
+    "{{ gitops_agent_checkout_dir }}/{{ gitops_agent_playbook }}"

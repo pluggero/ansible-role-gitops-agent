@@ -1,0 +1,22 @@
+---
+- name: Ensure we are using pacman
+  ansible.builtin.fail:
+    msg: "This role only supports {{ ansible_os_family }} systems that use pacman as a package manager."
+  when: ansible_pkg_mgr != "pacman"
+
+- name: Install gitops_agent dependencies via pacman
+  block:
+    - name: Update pacman cache
+      community.general.pacman:
+        update_cache: true
+      changed_when: false # The pacman module currently does not support cache_valid_time.
+      become: true
+
+    - name: Ensure gitops_agent dependencies are installed
+      community.general.pacman:
+        name: "{{ package }}"
+        state: present
+      loop: "{{ gitops_agent_dep_pkgs }}"
+      loop_control:
+        loop_var: package
+      become: true

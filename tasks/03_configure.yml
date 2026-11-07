@@ -1,0 +1,27 @@
+---
+- name: Ensure /etc/gitops directory exists
+  ansible.builtin.file:
+    path: /etc/gitops
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  become: true
+
+- name: Template dedicated known_hosts file
+  ansible.builtin.template:
+    src: known_hosts.j2
+    dest: /etc/gitops/known_hosts
+    mode: "0644"
+    owner: root
+    group: root
+  become: true
+
+- name: Template gitops-pull wrapper script
+  ansible.builtin.template:
+    src: gitops-pull.sh.j2
+    dest: /usr/local/bin/gitops-pull
+    mode: "0755"
+    owner: root
+    group: root
+  become: true

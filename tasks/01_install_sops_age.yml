@@ -1,0 +1,73 @@
+---
+- name: Check installed sops version
+  ansible.builtin.include_tasks: noauto_check_installed_sops_version.yml
+
+- name: Check installed age version
+  ansible.builtin.include_tasks: noauto_check_installed_age_version.yml
+
+- name: Install sops
+  when: gitops_agent_sops_installed_version != gitops_agent_sops_version
+  block:
+    - name: Install sops binary
+      ansible.builtin.get_url:
+        url: "https://github.com/getsops/sops/releases/download/v{{ gitops_agent_sops_version }}/sops-v{{ gitops_agent_sops_version }}.linux.amd64"
+        dest: /usr/local/bin/sops
+        checksum: "sha256:https://github.com/getsops/sops/releases/download/v{{ gitops_agent_sops_version }}/sops-v{{ gitops_agent_sops_version }}.checksums.txt"
+        mode: "0755"
+        owner: root
+        group: root
+      become: true
+
+- name: Install age and age-keygen
+  when: gitops_agent_age_installed_version != gitops_agent_age_version
+  block:
+    - name: Query GitHub release metadata for age
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/FiloSottile/age/releases/tags/v{{ gitops_agent_age_version }}"
+        return_content: true
+      register: gitops_agent_age_release
+
+    - name: Set age release asset checksum fact
+      ansible.builtin.set_fact:
+        gitops_agent_age_checksum: >-
+          {{ gitops_agent_age_release.json.assets
+             | selectattr('name', 'equalto', 'age-v' ~ gitops_agent_age_version ~ '-linux-amd64.tar.gz')
+             | map(attribute='digest') | first }}
+
+    - name: Download age release archive
+      ansible.builtin.get_url:
+        url: "https://github.com/FiloSottile/age/releases/download/v{{ gitops_agent_age_version }}/age-v{{ gitops_agent_age_version }}-linux-amd64.tar.gz"
+        dest: "/tmp/age-v{{ gitops_agent_age_version }}-linux-amd64.tar.gz"
+        checksum: "{{ gitops_agent_age_checksum }}"
+        mode: "0644"
+      become: true
+
+    - name: Extract age archive
+      ansible.builtin.unarchive:
+        src: "/tmp/age-v{{ gitops_agent_age_version }}-linux-amd64.tar.gz"
+        dest: /tmp
+        remote_src: true
+        creates: /tmp/age/age
+      become: true
+
+    - name: Install age and age-keygen binaries
+      ansible.builtin.copy:
+        src: "/tmp/age/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        remote_src: true
+        mode: "0755"
+        owner: root
+        group: root
+      loop:
+        - age
+        - age-keygen
+      become: true
+
+    - name: Remove age archive and extracted temp dir
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/age-v{{ gitops_agent_age_version }}-linux-amd64.tar.gz"
+        - /tmp/age
+      become: true

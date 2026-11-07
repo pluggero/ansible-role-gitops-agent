@@ -1,0 +1,112 @@
+---
+- name: Verify
+  hosts: all
+
+  vars_files:
+    - ../../defaults/main.yml
+
+  vars:
+    ansible_user: ansible
+    ansible_password: ansible
+    ansible_become_password: ansible
+
+  tasks:
+    - name: Check sops binary is installed and executable
+      ansible.builtin.stat:
+        path: /usr/local/bin/sops
+      register: sops_stat
+
+    - name: Assert sops binary exists and is executable
+      ansible.builtin.assert:
+        that:
+          - sops_stat.stat.exists
+          - sops_stat.stat.executable
+        fail_msg: "sops binary missing or not executable at /usr/local/bin/sops"
+
+    - name: Check installed sops version
+      ansible.builtin.include_tasks: "../../tasks/noauto_check_installed_sops_version.yml"
+
+    - name: Assert installed sops version matches the configured version
+      ansible.builtin.assert:
+        that: gitops_agent_sops_installed_version == gitops_agent_sops_version
+        fail_msg: >-
+          Installed sops version ({{ gitops_agent_sops_installed_version }})
+          does not match configured version ({{ gitops_agent_sops_version }})
+
+    - name: Check age and age-keygen binaries are installed
+      ansible.builtin.stat:
+        path: "/usr/local/bin/{{ item }}"
+      register: age_stat
+      loop: [age, age-keygen]
+
+    - name: Assert age binaries exist and are executable
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+          - item.stat.executable
+        fail_msg: "{{ item.item }} missing or not executable"
+      loop: "{{ age_stat.results }}"
+
+    - name: Check installed age version
+      ansible.builtin.include_tasks: "../../tasks/noauto_check_installed_age_version.yml"
+
+    - name: Assert installed age version matches the configured version
+      ansible.builtin.assert:
+        that: gitops_agent_age_installed_version == gitops_agent_age_version
+        fail_msg: >-
+          Installed age version ({{ gitops_agent_age_installed_version }})
+          does not match configured version ({{ gitops_agent_age_version }})
+
+    - name: Check ansible-pull exists inside the venv
+      ansible.builtin.stat:
+        path: /opt/gitops-agent/venv/bin/ansible-pull
+      register: ansible_pull_stat
+
+    - name: Assert ansible-pull binary exists in venv
+      ansible.builtin.assert:
+        that: ansible_pull_stat.stat.exists
+        fail_msg: "ansible-pull not found in /opt/gitops-agent/venv"
+
+    - name: Check installed ansible-core version in venv
+      ansible.builtin.command: /opt/gitops-agent/venv/bin/pip show ansible-core
+      register: ansible_core_version_check
+      changed_when: false
+
+    - name: Set installed ansible-core version fact
+      ansible.builtin.set_fact:
+        ansible_core_installed_version: >-
+          {{ (ansible_core_version_check.stdout | regex_search('Version: (\S+)', '\1'))
+             | default([''], true) | first }}
+
+    - name: Assert installed ansible-core version matches the configured version
+      ansible.builtin.assert:
+        that: ansible_core_installed_version == gitops_agent_ansible_core_version
+        fail_msg: >-
+          Installed ansible-core version ({{ ansible_core_installed_version }})
+          does not match configured version ({{ gitops_agent_ansible_core_version }})
+
+    - name: Check gitops-pull.service and .timer unit state
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+      register: unit_status
+      loop:
+        - gitops-pull.service
+        - gitops-pull.timer
+
+    - name: Assert gitops-pull.timer is enabled and active
+      ansible.builtin.assert:
+        that:
+          - unit_status.results[1].status.UnitFileState == "enabled"
+          - unit_status.results[1].status.ActiveState == "active"
+        fail_msg: "gitops-pull.timer is not enabled/active"
+
+    - name: Run the wrapper script directly
+      ansible.builtin.command: /usr/local/bin/gitops-pull
+      register: wrapper_run
+      changed_when: false
+
+    - name: Assert the wrapper exited cleanly via the inert guard
+      ansible.builtin.assert:
+        that:
+          - "'gitops not yet configured by cloud-init, skipping' in wrapper_run.stdout"
+        fail_msg: "Wrapper did not print the expected inert-guard message"
