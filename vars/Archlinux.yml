@@ -1,3 +1,5 @@
 ---
 gitops_agent_dep_pkgs:
   - python
+  - python-pip
+  - python-packaging
