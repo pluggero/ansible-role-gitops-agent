@@ -77,7 +77,7 @@ argument_specs:
         description: Pinned age/age-keygen version. Checksum is verified dynamically, nothing else to update.
       gitops_agent_ansible_core_version:
         type: str
-        default: "2.19.15"
+        default: "2.22.0"
         description: >-
           Pinned ansible-core version, used as
           "ansible-core=={{ gitops_agent_ansible_core_version }}" when
